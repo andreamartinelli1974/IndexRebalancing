@@ -66,12 +66,9 @@ catch ME
 input_params.history_start_date = ['01/01/2000'];
 input_params.history_end_date = datestr(today-1,'mm/dd/yyyy');
 input_params.granularity = "DAILY";
-input_params.UniverseTablePathName = "UniverseTable.xlsx";
-input_params.Holidays = "BorsaItalianaHolidays.xlsx";
-input_params.minimumNumberOfData = 100;
+input_params.UniverseTablePathName = "C:\Users\U093799\Documents\GitHub\IndexRebalancing\UniverseTable.xlsx";
 
 % read the investable universe (maybe a param files)
-Holidays = readtable(input_params.Holidays);
 InvestableUniverse = readtable(input_params.UniverseTablePathName);
 
 
@@ -105,9 +102,8 @@ end
 %% create and fill all the equities objects
 
 e_cnt = 0;
-exept_cnt = 0;
 for i = 1:numel(tickersList)
-    % generate ticker name used in ParallelBBG
+    % generate ticker name used in 
     adj_ticker = strrep(tickersListFXe.Var1{i},' ','_'); % removing '_' to get string that can be used as field names
     adj_ticker = strrep(adj_ticker,'/','_'); % removing '/'
     adj_ticker = strrep(adj_ticker,'.','_'); % removing '.'
@@ -116,31 +112,21 @@ for i = 1:numel(tickersList)
     adj_ticker = strrep(adj_ticker,'-','_');
     adj_ticker = strrep(adj_ticker,'=','_');
     
-    if tickersListFXe.Var2(i) == 1;
+    if tickersListFXe.Var2(k) == 1;
         tkrname = ['ticker_',adj_ticker,'_FXE'];
     else
         tkrname = ['ticker_',adj_ticker];
     end
     e_params.ticker = tkrname; 
-    e_params.holidays = Holidays.Date;
-    e_params.bbg_data = BBG_SimultaneousData;
     e_cnt = e_cnt+1;
     try
-        E(e_cnt,1) = Equity(e_params);
+        Equity(e_cnt) = Equity(e_params);
+        Equity(e_cnt).createEquity;
     catch AM
         disp(["error while creating",e_params.ticker]);
+        
         e_cnt = e_cnt-1;
-        exept_cnt = exept_cnt +1;
-        exception{exept_cnt} = e_params.ticker;   
-    end
 end
-
-%% Create the Univers
-clear Universe_1
-
-u_params.equities = E;
-u_params.minNumData = input_params.minimumNumberOfData;
-Universe_1 = Universe(u_params);
     
 
 
