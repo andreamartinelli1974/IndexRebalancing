@@ -14,6 +14,7 @@ classdef Equity<handle
         bbg_data;
         HistStockData;
         StaticStockData;
+        SharesFromFTSE;
         % and others to follow
     end
     
@@ -21,6 +22,7 @@ classdef Equity<handle
         function E = Equity(params)
             E.Ticker = params.ticker;
             E.HolidaysDate = params.holidays;
+            E.SharesFromFTSE = params.shares;
             bbg_data = params.bbg_data;
             E.bbg_data.dates = bbg_data.Data.Historical.(E.Ticker).dates;
             E.bbg_data.PX_LAST = bbg_data.Data.Historical.(E.Ticker).bbgField_PX_LAST;

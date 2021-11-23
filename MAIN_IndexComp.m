@@ -8,6 +8,11 @@
 % TODO: 1) retrive all the investable univere stocks data from bbg
 %       2) using the data to calculate the actual index composition
 
+
+%%%%%%% FTSE MIB RELEVANT DATES  %%%%%%%
+% REBALANCING DATES: last friday of March, June, September, November
+% DATA CUT-OFF DATES: monday 4 weeks before rebalancing date. 
+
 clear all;
 close all;
 clc;
@@ -63,7 +68,7 @@ catch ME
 %% Input session
 
 % input_params: (eventually to be exported in excel files)
-input_params.history_start_date = ['01/01/2000'];
+input_params.history_start_date = ['01/01/2017'];
 input_params.history_end_date = datestr(today-1,'mm/dd/yyyy');
 input_params.granularity = "DAILY";
 input_params.UniverseTablePathName = "UniverseTable.xlsx";
@@ -106,9 +111,13 @@ end
 
 e_cnt = 0;
 exept_cnt = 0;
-for i = 1:numel(tickersList)
+for i = 1:numel(tickersListFXe.Var1)
+    % get number of shares in InvestableUniverse
+    ticker = tickersListFXe.Var1{i};
+    idx = find(strcmp(InvestableUniverse.Ticker,ticker));
+    shares = InvestableUniverse.Shares(idx);
     % generate ticker name used in ParallelBBG
-    adj_ticker = strrep(tickersListFXe.Var1{i},' ','_'); % removing '_' to get string that can be used as field names
+    adj_ticker = strrep(ticker,' ','_'); % removing '_' to get string that can be used as field names
     adj_ticker = strrep(adj_ticker,'/','_'); % removing '/'
     adj_ticker = strrep(adj_ticker,'.','_'); % removing '.'
     adj_ticker = strrep(adj_ticker,'(','_'); % removing '('
@@ -121,9 +130,11 @@ for i = 1:numel(tickersList)
     else
         tkrname = ['ticker_',adj_ticker];
     end
+    
     e_params.ticker = tkrname; 
     e_params.holidays = Holidays.Date;
     e_params.bbg_data = BBG_SimultaneousData;
+    e_params.shares = shares;
     e_cnt = e_cnt+1;
     try
         E(e_cnt,1) = Equity(e_params);
@@ -142,8 +153,9 @@ u_params.equities = E;
 u_params.minNumData = input_params.minimumNumberOfData;
 Universe_1 = Universe(u_params);
     
+%%
 
-
+Universe_1.ftsemibCalculator();
 
 
 
