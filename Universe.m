@@ -139,10 +139,11 @@ classdef Universe<handle
                 while firstMonth+j<size(stockData,1)
                     %%% TO BE MODIFIED WHEN USING SHARE RULE & FREEFLOAT RULE %%
                     shares = stockData(firstMonth+j,5)*10e6;
+                    shares2 = U.Equities(i).SharesFromFTSE*10e6;
                     ff = stockData(firstMonth+j,4);
                     j = j+1;
                     SharesInIssue(j,1) = enddate;
-                    SharesInIssue(j,2) = shares;
+                    SharesInIssue(j,2) = shares2;
                     FreeFloat(j,1) = enddate;
                     FreeFloat(j,2) = ff/100;
                     enddate = stockData(firstMonth+j,1);
