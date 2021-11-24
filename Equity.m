@@ -11,6 +11,8 @@ classdef Equity<handle
     properties (SetAccess = protected)
         Ticker;
         HolidaysDate;
+        TradingDays;
+        NonTradingDays;
         bbg_data;
         HistStockData;
         StaticStockData;
@@ -22,6 +24,8 @@ classdef Equity<handle
         function E = Equity(params)
             E.Ticker = params.ticker;
             E.HolidaysDate = params.holidays;
+            E.TradingDays = params.tradingDays;
+            E.NonTradingDays = params.nonTradingDays
             E.SharesFromFTSE = params.shares;
             bbg_data = params.bbg_data;
             E.bbg_data.dates = bbg_data.Data.Historical.(E.Ticker).dates;

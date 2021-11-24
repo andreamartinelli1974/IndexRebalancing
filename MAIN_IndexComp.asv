@@ -113,7 +113,7 @@ if ~DataFromBBG.save2disk & ~DataFromBBG.NOBBG % CANNOT BE USED WHEN USING THE '
         BBG_SimultaneousData.GetStaticData;
     end
 end
-%% create the TradingDays list from index & calculate nonTradingDays as difference
+%% create the TradingDays list from index & calculate Holidays as difference
 adj_ticker = strrep("FTSEMIB Index",' ','_'); % removing '_' to get string that can be used as field names
     adj_ticker = strrep(adj_ticker,'/','_'); % removing '/'
     adj_ticker = strrep(adj_ticker,'.','_'); % removing '.'
@@ -126,7 +126,7 @@ tkrname = strcat('ticker_',adj_ticker);
    
 TradingDays = BBG_SimultaneousData.Data.Historical.(tkrname).dates;
 allDate = (TradingDays(1):1:TradingDays(end));
-nonTradingDays = setdiff(allDate,TradingDays)';
+HolidaysFromIndex = setdiff(
 
 
 %% create and fill all the equities objects
@@ -155,8 +155,6 @@ for i = 1:numel(tickersListFXe.Var1)-1
     
     e_params.ticker = tkrname; 
     e_params.holidays = Holidays.Date;
-    e_params.nonTradingDays = nonTradingDays; 
-    e_params.tradingDays = TradingDays;
     e_params.bbg_data = BBG_SimultaneousData;
     e_params.shares = shares;
     e_cnt = e_cnt+1;
