@@ -1,17 +1,8 @@
-% INDEX REBALANCING MAIN
-
-% 2021-11-11 AM:
-% Working on index periodic rebalancing and composition,
-% The goal is to preview, some days before the announcement, the stocks 
-% that will be out and the ones that will be in.
-% First steps: calculate the index composition using the index rules
-% TODO: 1) retrive all the investable univere stocks data from bbg
-%       2) using the data to calculate the actual index composition
-
-
-%%%%%%% FTSE MIB RELEVANT DATES  %%%%%%%
-% REBALANCING DATES: last friday of March, June, September, November
-% DATA CUT-OFF DATES: monday 4 weeks before rebalancing date. 
+% PROFITABILITY TEST %
+% using the past index in/out and different time horizon for in and out for
+% the trade, we ty to figure out the profitability of the strategy
+% WE ARE USING ONLY THE ORDINARY QUARTERLY REVIEWS INCLUSIONS AND
+% EXCLUSIONS, AND ONLY FOR AVAILABLE BBG TICKERS
 
 clear all;
 close all;
@@ -31,7 +22,7 @@ end
 % **************** STRUCTURE TO ACCESS BLOOMBERG DATA *********************
 DataFromBBG.save2disk = false(1); % false(1); % True to save all Bloomberg calls to disk for future retrieval
 DataFromBBG.folder = [cd,'\BloombergCallsData\'];
- 
+
 if DataFromBBG.save2disk
     if exist('BloombergCallsData','dir')==7
         rmdir(DataFromBBG.folder(1:end-1),'s');
@@ -39,7 +30,7 @@ if DataFromBBG.save2disk
     mkdir(DataFromBBG.folder(1:end-1));
 end
 
- try
+try
     % javaaddpath('C:\blp\DAPI\blpapi3.jar');
     DataFromBBG.BBG_conn = blp; % throw error when Bloomberg is not installed
     pause(2);
@@ -57,27 +48,25 @@ catch ME
     %     return
     % end
     if isdeployed
-    RunMsg = msgbox('Connection to Bloomberg not available', ...
-        'Deployed code execution');
+        RunMsg = msgbox('Connection to Bloomberg not available', ...
+            'Deployed code execution');
     end
     DataFromBBG.BBG_conn = [];
     DataFromBBG.NOBBG = true(1); % if true (on machines with no BBG terminal), data are recovered from previously saved files (.save2disk option above)
- end
- 
- 
-%% Input session
+end
 
-% input_params: (eventually to be exported in excel files)
-input_params.history_start_date = ['01/01/2017'];
-input_params.history_end_date = datestr(today-1,'mm/dd/yyyy');
-input_params.granularity = "DAILY";
-input_params.UniverseTablePathName = "UniverseTable.xlsx";
-input_params.Holidays = "BorsaItalianaHolidays.xlsx";
-input_params.minimumNumberOfData = 100;
+%% Input Session
+PreviousLag = 60; % calendar
+PosteriorLag = 7; % calendar
+InvestedAmount = 100000;
 
-% read the investable universe (maybe a param files)
-Holidays = readtable(input_params.Holidays);
-InvestableUniverse = readtable(input_params.UniverseTablePathName);
+ReviewTable = readtable('Rebalancing.xlsx');
+
+mindate = min(ReviewTable.dataDiCalcolo);
+mindate = busdate(mindate-PreviousLag,-1);
+
+tickersList = unique([ReviewTable.tkrEscluse; ReviewTable.tkrAmmesse]);
+tickersList(find(contains(tickersList,'#na')))=[];
 
 
 %% create instance of class 'ParallelBBG'
@@ -85,14 +74,12 @@ InvestableUniverse = readtable(input_params.UniverseTablePathName);
 % objects of class 'asset', IR_Curve, CDS, etc.
 BBG_SimultaneousData = [];
 % % if false % to exclude parallel download from BBG
-    
+
+input_params.history_start_date = mindate;
+input_params.history_end_date = datestr(today-1,'mm/dd/yyyy');
+input_params.granularity = "DAILY";
+
 if ~DataFromBBG.save2disk & ~DataFromBBG.NOBBG % CANNOT BE USED WHEN USING THE 'save to disk feature' or the NOBBG one
-    
-    disp('Downloading BBG data');
-    
-    clear BBG_SimultaneousData;
-    
-    tickersList = InvestableUniverse.Ticker; %% TO BE READ FROM EXCEL
     
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %    THIS IS INDEX SPECIFIC: INDEX TICKER USED TO GET TRADING DAYS    %
@@ -106,12 +93,13 @@ if ~DataFromBBG.save2disk & ~DataFromBBG.NOBBG % CANNOT BE USED WHEN USING THE '
     parallelBBG_params.hist.startDate = input_params.history_start_date;
     parallelBBG_params.hist.endDate = input_params.history_end_date;
     parallelBBG_params.hist.granularity = input_params.granularity;
-
+    
     if true(1) % false(1) ** to include/exclude simultaneous download
         BBG_SimultaneousData = ParallelBBG(DataFromBBG,tickersListFXe,parallelBBG_params);
         BBG_SimultaneousData.GetHistoricalData;
         BBG_SimultaneousData.GetStaticData;
     end
+    
 end
 
 %% create the TradingDays list from index & calculate nonTradingDays as difference
@@ -129,16 +117,14 @@ TradingDays = BBG_SimultaneousData.Data.Historical.(tkrname).dates;
 allDate = (TradingDays(1):1:TradingDays(end));
 nonTradingDays = setdiff(allDate,TradingDays)';
 
-
 %% create and fill all the equities objects
 
 e_cnt = 0;
 exept_cnt = 0;
 for i = 1:numel(tickersListFXe.Var1)-1
-    % get number of shares in InvestableUniverse
     ticker = tickersListFXe.Var1{i};
-    idx = find(strcmp(InvestableUniverse.Ticker,ticker));
-    shares = InvestableUniverse.Shares(idx);
+    % set shares number = 0 (is usless in this exercise)
+    shares = 0;
     % generate ticker name used in ParallelBBG
     adj_ticker = strrep(ticker,' ','_'); % removing '_' to get string that can be used as field names
     adj_ticker = strrep(adj_ticker,'/','_'); % removing '/'
@@ -155,7 +141,7 @@ for i = 1:numel(tickersListFXe.Var1)-1
     end
     
     e_params.ticker = tkrname; 
-    e_params.holidays = Holidays.Date;
+    e_params.holidays = [];
     e_params.nonTradingDays = nonTradingDays; 
     e_params.tradingDays = TradingDays;
     e_params.bbg_data = BBG_SimultaneousData;
@@ -163,6 +149,7 @@ for i = 1:numel(tickersListFXe.Var1)-1
     e_cnt = e_cnt+1;
     try
         E(e_cnt,1) = Equity(e_params);
+        tickersList{i,2}=e_cnt;
     catch AM
         disp(["error while creating",e_params.ticker]);
         e_cnt = e_cnt-1;
@@ -171,23 +158,69 @@ for i = 1:numel(tickersListFXe.Var1)-1
     end
 end
 
-%% Create the Universe
-clear Universe_1
+%% calculating the porfitability
 
-u_params.equities = E;
-u_params.minNumData = input_params.minimumNumberOfData;
-u_params.bbg_data = BBG_SimultaneousData;
-Universe_1 = Universe(u_params);
+uniqueDate = unique(ReviewTable.dataDiCalcolo);
+OutPerf = [];
+
+for i = 1:numel(uniqueDate)
     
-%%
+    calcDate = uniqueDate(i);
+    dateidx = find(ReviewTable.dataDiCalcolo==calcDate);
+    reviewDate = ReviewTable.DataEffettiva(dateidx);
+    
+    % calculate the collection of date to start the investment, from
+    % calcDate - PreviousLag to calcDate -1
+    prevDate = allDate(find(allDate>=datenum(calcDate-PreviousLag)& allDate<datenum(calcDate)));
+    
+    % calculate the collection of date to stop the investment, from
+    % calcDate + 1 to calcDate + PosteriorLag
+    postDate = allDate(find(allDate>datenum(reviewDate)& allDate<=datenum(reviewDate+PosteriorLag)));
+    
+    datePerf{i} 
+    OutPerf{i} = zeros(numel(prevDate),numel(postDate));
+    InPerf{i}  = zeros(numel(prevDate),numel(postDate));
+    
+    for z = 1:numel(dateidx)
+        
+        position = dateidx(z);
+        % calculate the p&l for any prevDate & postDate combination
+        for j=1:numel(prevDate)
+            for k = 1:numel(postDate)
+                tickerOut = ReviewTable.tkrEscluse(position);
+                if ~strcmp(tickerOut,"#na")
+                    idxOut = strcmp(tickersList(:,1),tickerOut);
+                    stockHistOut = E(idxOut).HistStockData(:,1:2);
+                    fdstart = find(stockHistOut(:,1)==prevDate(j));
+                    fdend = find(stockHistOut(:,1)==postDate(k));
+                    priceStartOut = stockHistOut(fdstart,2);
+                    priceEndOut = stockHistOut(fdend,2);
+                    
+                    if(~isempty(priceEndOut) & ~isempty(priceStartOut))
+                        OutPerf{i}(j,k)  = OutPerf{i}(j,k)+ InvestedAmount * log(priceEndOut/priceStartOut);
+                    end
+                end
+                
+                tickerIn = ReviewTable.tkrAmmesse(position);
+                if ~strcmp(tickerIn,"#na")
+                    idxIn = strcmp(tickersList(:,1),tickerIn);
+                    stockHistIn = E(idxIn).HistStockData(:,1:2);
+                    fdstart = find(stockHistIn(:,1)==prevDate(j));
+                    fdend = find(stockHistIn(:,1)==postDate(k));
+                    priceStartIn = stockHistIn(fdstart,2);
+                    priceEndIn = stockHistIn(fdend,2);
+                    if(~isempty(priceEndIn) & ~isempty(priceStartIn))
+                        InPerf{i}(j,k)   = InPerf{i}(j,k)  + InvestedAmount * log(priceEndIn/priceStartIn);
+                    end
+                end
+            end
+        end
+        
+    end
+    
+end
 
-Universe_1.ftsemibCalculator();
 
 
 
 
-
-
-
-
- 
