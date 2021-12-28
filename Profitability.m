@@ -57,13 +57,14 @@ end
 
 %% Input Session
 PreviousLag = 60; % calendar
-PosteriorLag = 7; % calendar
+BDayCompensator = round(60/1.5,0);
+PosteriorLag = 14; % calendar
 InvestedAmount = 100000;
 
 ReviewTable = readtable('Rebalancing.xlsx');
 
 mindate = min(ReviewTable.dataDiCalcolo);
-mindate = busdate(mindate-PreviousLag,-1);
+mindate = busdate(mindate-PreviousLag-BDayCompensator,-1);
 
 tickersList = unique([ReviewTable.tkrEscluse; ReviewTable.tkrAmmesse]);
 tickersList(find(contains(tickersList,'#na')))=[];
@@ -171,15 +172,12 @@ for i = 1:numel(uniqueDate)
     
     % calculate the collection of date to start the investment, from
     % calcDate - PreviousLag to calcDate -1
-    prevDate = allDate(find(allDate>=datenum(calcDate-PreviousLag)& allDate<datenum(calcDate)));
-    
+    prevDate = TradingDays(find(TradingDays>=datenum(calcDate-PreviousLag-BDayCompensator)& TradingDays<datenum(calcDate)));
+    prevDate = prevDate(end-PreviousLag+1:end,:);
     % calculate the collection of date to stop the investment, from
     % calcDate + 1 to calcDate + PosteriorLag
-    try
-    postDate = allDate(allDate>datenum(reviewDate)& allDate<=datenum(reviewDate+PosteriorLag));
-    catch AM
-        a = 1;
-    end
+    postDate = TradingDays(TradingDays>datenum(reviewDate)& TradingDays<=datenum(reviewDate+PosteriorLag+BDayCompensator));
+    postDate = postDate(1:PosteriorLag,:);
     
     OutPerf{i} = zeros(numel(prevDate),numel(postDate));
     InPerf{i}  = zeros(numel(prevDate),numel(postDate));
@@ -218,10 +216,66 @@ for i = 1:numel(uniqueDate)
                 end
             end
         end
-        
     end
-    
 end
+
+%% calculate profit metrics
+
+% sum the OutPer for any Review date and do the same for InPerf
+outPerfSize = size(OutPerf{1});
+dimensions = [numel(OutPerf),outPerfSize];
+OutPerfCube = zeros(dimensions);
+InPerfCube = zeros(dimensions);
+
+for i = 1:numel(OutPerf)
+    OutPerfCube(i,:,:) = OutPerf{i};
+    InPerfCube(i,:,:) = InPerf{i};
+end
+
+
+for k=1:outPerfSize(1)
+    for j=1:outPerfSize(2)
+        zerocountOut(k,j) = dimensions(1) - sum(OutPerfCube(:,k,j)==0);
+        zerocountIn(k,j) = dimensions(1) - sum(InPerfCube(:,k,j)==0);
+    end
+end
+
+rowtodelete =(zerocountOut(:,1)==0);
+coltodelete =(zerocountOut(1,:)==0);
+OutPerfCube(:,rowtodelete,:) = [];
+OutPerfCube(:,:,coltodelete) = [];
+zerocountOut(rowtodelete,:) = [];
+zerocountOut(:,coltodelete) = [];
+cubeSize = size(OutPerfCube);
+aa = sum(OutPerfCube,1);
+totOutPerf = reshape(aa,cubeSize(2:3))./zerocountOut;
+
+rowtodelete =(zerocountIn(:,1)==0);
+coltodelete =(zerocountIn(1,:)==0);
+InPerfCube(:,rowtodelete,:) = [];
+InPerfCube(:,:,coltodelete) = [];
+zerocountIn(rowtodelete,:) = [];
+zerocountIn(:,coltodelete) = [];
+cubeSize = size(InPerfCube);
+bb = sum(InPerfCube,1);
+totInPerf  = reshape(bb,cubeSize(2:3))./zerocountIn;
+
+OutPerfCube(OutPerfCube==0) = NaN;
+InPerfCube(InPerfCube==0) = NaN;
+
+for k=1:cubeSize(2)
+    for j=1:cubeSize(3)
+        maxOut(k,j) = max(OutPerfCube(:,k,j));
+        minOut(k,j) = min(OutPerfCube(:,k,j));
+        maxIn(k,j) = max(InPerfCube(:,k,j));
+        minIn(k,j) = min(InPerfCube(:,k,j));
+        Out25(k,j) = prctile(OutPerfCube(:,k,j),25);
+        Out75(k,j) = prctile(OutPerfCube(:,k,j),75);
+        In25(k,j) = prctile(OutPerfCube(:,k,j),25);
+        In75(k,j) = prctile(OutPerfCube(:,k,j),75);
+    end
+end
+
 
 
 

@@ -25,7 +25,7 @@ classdef Equity<handle
             E.Ticker = params.ticker;
             E.HolidaysDate = params.holidays;
             E.TradingDays = params.tradingDays;
-            E.NonTradingDays = params.nonTradingDays
+            E.NonTradingDays = params.nonTradingDays;
             E.SharesFromFTSE = params.shares;
             bbg_data = params.bbg_data;
             E.bbg_data.dates = bbg_data.Data.Historical.(E.Ticker).dates;
