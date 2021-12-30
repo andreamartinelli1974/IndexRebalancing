@@ -56,9 +56,9 @@ catch ME
 end
 
 %% Input Session
-PreviousLag = 60; % calendar
-BDayCompensator = round(60/1.5,0);
-PosteriorLag = 14; % calendar
+PreviousLag = 10; % calendar
+BDayCompensator = PreviousLag;
+PosteriorLag = 5; % calendar
 InvestedAmount = 100000;
 
 ReviewTable = readtable('Rebalancing.xlsx');
@@ -179,41 +179,48 @@ for i = 1:numel(uniqueDate)
     postDate = TradingDays(TradingDays>datenum(reviewDate)& TradingDays<=datenum(reviewDate+PosteriorLag+BDayCompensator));
     postDate = postDate(1:PosteriorLag,:);
     
-    OutPerf{i} = zeros(numel(prevDate),numel(postDate));
-    InPerf{i}  = zeros(numel(prevDate),numel(postDate));
+    OutPerf{i} = zeros(numel(prevDate)+1,numel(postDate)+1);
+    InPerf{i}  = zeros(numel(prevDate)+1,numel(postDate)+1);
+    
+    OutPerf{i}(1,1) = 1;
+    InPerf{i}(1,1) = 1;
     
     for z = 1:numel(dateidx)
         
         position = dateidx(z);
         % calculate the p&l for any prevDate & postDate combination
-        for j=1:numel(prevDate)
-            for k = 1:numel(postDate)
+        for j=2:numel(prevDate)+1
+            for k = 2:numel(postDate)+1
                 tickerOut = ReviewTable.tkrEscluse(position);
-                datePerf{i}{j,k} = {prevDate(j),postDate(k)};
+                %datePerf{i}{j,k} = {prevDate(j),postDate(k)};
                 if ~strcmp(tickerOut,"#na")
                     idxOut = strcmp(tickersList(:,1),tickerOut);
                     stockHistOut = E(idxOut).HistStockData(:,1:2);
-                    fdstart = find(stockHistOut(:,1)==prevDate(j));
-                    fdend = find(stockHistOut(:,1)==postDate(k));
+                    fdstart = find(stockHistOut(:,1)==prevDate(j-1));
+                    fdend = find(stockHistOut(:,1)==postDate(k-1));
                     priceStartOut = stockHistOut(fdstart,2);
                     priceEndOut = stockHistOut(fdend,2);
                     if(~isempty(priceEndOut) & ~isempty(priceStartOut))
-                        OutPerf{i}(j,k)  = OutPerf{i}(j,k)+ InvestedAmount * log(priceEndOut/priceStartOut);
+                        OutPerf{i}(j,k)  = OutPerf{i}(j,k)- InvestedAmount * ((priceEndOut-priceStartOut)/priceStartOut);
                     end
                 end
+                OutPerf{i}(j,1)=-(size(prevDate,1)-j+2);
+                OutPerf{i}(1,k)=(k-1);
                 
                 tickerIn = ReviewTable.tkrAmmesse(position);
                 if ~strcmp(tickerIn,"#na")
                     idxIn = strcmp(tickersList(:,1),tickerIn);
                     stockHistIn = E(idxIn).HistStockData(:,1:2);
-                    fdstart = find(stockHistIn(:,1)==prevDate(j));
-                    fdend = find(stockHistIn(:,1)==postDate(k));
+                    fdstart = find(stockHistIn(:,1)==prevDate(j-1));
+                    fdend = find(stockHistIn(:,1)==postDate(k-1));
                     priceStartIn = stockHistIn(fdstart,2);
                     priceEndIn = stockHistIn(fdend,2);
                     if(~isempty(priceEndIn) & ~isempty(priceStartIn))
-                        InPerf{i}(j,k)   = InPerf{i}(j,k)  + InvestedAmount * log(priceEndIn/priceStartIn);
+                        InPerf{i}(j,k)   = InPerf{i}(j,k)  + InvestedAmount * ((priceEndIn-priceStartIn)/priceStartIn);
                     end
                 end
+                InPerf{i}(j,1)=-(size(prevDate,1)-j+2);
+                InPerf{i}(1,k)=(k-1);
             end
         end
     end
@@ -223,58 +230,90 @@ end
 
 % sum the OutPer for any Review date and do the same for InPerf
 outPerfSize = size(OutPerf{1});
-dimensions = [numel(OutPerf),outPerfSize];
+dimensions = [outPerfSize,numel(OutPerf)];
 OutPerfCube = zeros(dimensions);
 InPerfCube = zeros(dimensions);
 
 for i = 1:numel(OutPerf)
-    OutPerfCube(i,:,:) = OutPerf{i};
-    InPerfCube(i,:,:) = InPerf{i};
+    OutPerfCube(:,:,i) = OutPerf{i};
+    InPerfCube(:,:,i) = InPerf{i};
 end
 
 
 for k=1:outPerfSize(1)
     for j=1:outPerfSize(2)
-        zerocountOut(k,j) = dimensions(1) - sum(OutPerfCube(:,k,j)==0);
-        zerocountIn(k,j) = dimensions(1) - sum(InPerfCube(:,k,j)==0);
+        zerocountOut(k,j) = dimensions(3) - sum(OutPerfCube(k,j,:)==0);
+        zerocountIn(k,j) = dimensions(3) - sum(InPerfCube(k,j,:)==0);
     end
 end
 
 rowtodelete =(zerocountOut(:,1)==0);
 coltodelete =(zerocountOut(1,:)==0);
 OutPerfCube(:,rowtodelete,:) = [];
-OutPerfCube(:,:,coltodelete) = [];
+OutPerfCube(coltodelete,:,:) = [];
 zerocountOut(rowtodelete,:) = [];
 zerocountOut(:,coltodelete) = [];
 cubeSize = size(OutPerfCube);
-aa = sum(OutPerfCube,1);
-totOutPerf = reshape(aa,cubeSize(2:3))./zerocountOut;
+totOutPerf = sum(OutPerfCube,3)./zerocountOut;
 
 rowtodelete =(zerocountIn(:,1)==0);
 coltodelete =(zerocountIn(1,:)==0);
 InPerfCube(:,rowtodelete,:) = [];
-InPerfCube(:,:,coltodelete) = [];
+InPerfCube(coltodelete,:,:) = [];
 zerocountIn(rowtodelete,:) = [];
 zerocountIn(:,coltodelete) = [];
 cubeSize = size(InPerfCube);
-bb = sum(InPerfCube,1);
-totInPerf  = reshape(bb,cubeSize(2:3))./zerocountIn;
+totInPerf  = sum(InPerfCube,3)./zerocountIn;
 
 OutPerfCube(OutPerfCube==0) = NaN;
 InPerfCube(InPerfCube==0) = NaN;
 
-for k=1:cubeSize(2)
-    for j=1:cubeSize(3)
-        maxOut(k,j) = max(OutPerfCube(:,k,j));
-        minOut(k,j) = min(OutPerfCube(:,k,j));
-        maxIn(k,j) = max(InPerfCube(:,k,j));
-        minIn(k,j) = min(InPerfCube(:,k,j));
-        Out25(k,j) = prctile(OutPerfCube(:,k,j),25);
-        Out75(k,j) = prctile(OutPerfCube(:,k,j),75);
-        In25(k,j) = prctile(OutPerfCube(:,k,j),25);
-        In75(k,j) = prctile(OutPerfCube(:,k,j),75);
+for k=1:cubeSize(1)
+    for j=1:cubeSize(2)
+        medianOut(k,j) = median(OutPerfCube(k,j,:),'omitnan');
+        medianIn(k,j)  = median(InPerfCube(k,j,:),'omitnan');
+        maxOut(k,j)    = max(OutPerfCube(k,j,:));
+        minOut(k,j)    = min(OutPerfCube(k,j,:));
+        maxIn(k,j)     = max(InPerfCube(k,j,:));
+        minIn(k,j)     = min(InPerfCube(k,j,:));
+        Out25(k,j)     = prctile(OutPerfCube(k,j,:),25);
+        Out75(k,j)     = prctile(OutPerfCube(k,j,:),75);
+        In25(k,j)      = prctile(OutPerfCube(k,j,:),25);
+        In75(k,j)      = prctile(OutPerfCube(k,j,:),75);
     end
 end
+
+%% boxplot
+close all
+
+bplotIn  = zeros(size(InPerfCube,3)+1,size(InPerfCube,1)-1);
+bplotOut = zeros(size(InPerfCube,3)+1,size(InPerfCube,1)-1);
+for i = 2:size(medianOut,2)
+    
+    for k=1:size(medianOut,1)-1
+        bplotIn(1,k) = InPerfCube(k+1,1,1);
+        bplotIn(2:end,k)= InPerfCube(k+1,i,:);
+        bplotOut(1,k) = OutPerfCube(k+1,1,1);
+        bplotOut(2:end,k)= OutPerfCube(k+1,i,:);
+    end
+    figure;
+    boxplot(bplotIn(2:end,:));
+    title(strcat("Investment in admetted name: Posterior lag = ", num2str(i-1)));
+    xticklabels( bplotIn(1,:));
+    xlabel("Business days before the Calc. Date");
+    ylabel(strcat("P&L on ",num2str(InvestedAmount)," eur long"));
+    ytickformat('eur');
+    
+    figure 
+    boxplot(bplotOut(2:end,:));
+    title(strcat("Investment in excluded name: Posterior lag = ", num2str(i-1)));
+    xticklabels( bplotOut(1,:));
+    xlabel("Business days before the Calc. Date");
+    ylabel(strcat("P&L on ",num2str(InvestedAmount)," eur short"));
+    ytickformat('eur');
+end
+
+
 
 
 
