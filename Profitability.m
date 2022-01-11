@@ -56,7 +56,7 @@ catch ME
 end
 
 %% Input Session
-PreviousLag = 10; % calendar
+PreviousLag = 40; % calendar
 BDayCompensator = PreviousLag;
 PosteriorLag = 5; % calendar
 InvestedAmount = 100000;
