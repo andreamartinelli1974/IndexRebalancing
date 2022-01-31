@@ -162,6 +162,7 @@ end
 %% calculating the porfitability
 
 uniqueDate = unique(ReviewTable.dataDiCalcolo);
+%date = ReviewTable.dataDiCalcolo;
 OutPerf = [];
 
 for i = 1:numel(uniqueDate)
@@ -169,6 +170,9 @@ for i = 1:numel(uniqueDate)
     calcDate = uniqueDate(i);
     dateidx = find(ReviewTable.dataDiCalcolo==calcDate);
     reviewDate = ReviewTable.DataEffettiva(dateidx(1));
+    %calcDate = date(i);
+    %dateidx = 1;
+    %reviewDate = ReviewTable.DataEffettiva(i);
     
     % calculate the collection of date to start the investment, from
     % calcDate - PreviousLag to calcDate -1
@@ -233,6 +237,8 @@ outPerfSize = size(OutPerf{1});
 dimensions = [outPerfSize,numel(OutPerf)];
 OutPerfCube = zeros(dimensions);
 InPerfCube = zeros(dimensions);
+tkrIn = ReviewTable.tkrAmmesse;
+tkrOut = ReviewTable.tkrEscluse;
 
 for i = 1:numel(OutPerf)
     OutPerfCube(:,:,i) = OutPerf{i};
@@ -255,6 +261,7 @@ zerocountOut(rowtodelete,:) = [];
 zerocountOut(:,coltodelete) = [];
 cubeSize = size(OutPerfCube);
 totOutPerf = sum(OutPerfCube,3)./zerocountOut;
+tkrOut(strcmp(tkrOut,"#na"),:) = [];
 
 rowtodelete =(zerocountIn(:,1)==0);
 coltodelete =(zerocountIn(1,:)==0);
@@ -264,6 +271,7 @@ zerocountIn(rowtodelete,:) = [];
 zerocountIn(:,coltodelete) = [];
 cubeSize = size(InPerfCube);
 totInPerf  = sum(InPerfCube,3)./zerocountIn;
+tkrIn(rowtodelete,:) = [];
 
 OutPerfCube(OutPerfCube==0) = NaN;
 InPerfCube(InPerfCube==0) = NaN;
@@ -272,10 +280,10 @@ for k=1:cubeSize(1)
     for j=1:cubeSize(2)
         medianOut(k,j) = median(OutPerfCube(k,j,:),'omitnan');
         medianIn(k,j)  = median(InPerfCube(k,j,:),'omitnan');
-        maxOut(k,j)    = max(OutPerfCube(k,j,:));
-        minOut(k,j)    = min(OutPerfCube(k,j,:));
-        maxIn(k,j)     = max(InPerfCube(k,j,:));
-        minIn(k,j)     = min(InPerfCube(k,j,:));
+        [maxOut(k,j),maxOutIdx(k,j)] = max(OutPerfCube(k,j,:));
+        [minOut(k,j),minOutIdx(k,j)] = min(OutPerfCube(k,j,:));
+        [maxIn(k,j),maxInIdx(k,j)] = max(InPerfCube(k,j,:));
+        [minIn(k,j),minInIdx(k,j)]= min(InPerfCube(k,j,:));
         Out25(k,j)     = prctile(OutPerfCube(k,j,:),25);
         Out75(k,j)     = prctile(OutPerfCube(k,j,:),75);
         In25(k,j)      = prctile(OutPerfCube(k,j,:),25);
@@ -313,10 +321,55 @@ for i = 2:size(medianOut,2)
     ytickformat('eur');
 end
 
+%% find outliers (max & min)
+[rows, cols] = size(maxInIdx);
+for i = 2:rows
+    for j = 2:cols
+        maxInDates(i-1,j-1)=uniqueDate(maxInIdx(i,j));
+        minInDates(i-1,j-1)=uniqueDate(minInIdx(i,j));
+        maxOutDates(i-1,j-1)=uniqueDate(maxOutIdx(i,j));
+        minOutDates(i-1,j-1)=uniqueDate(minOutIdx(i,j));
+        
+        %maxInDates(i-1,j-1)=date(maxInIdx(i,j));
+        %minInDates(i-1,j-1)=date(minInIdx(i,j));
+        %maxOutDates(i-1,j-1)=date(maxOutIdx(i,j));
+        %minOutDates(i-1,j-1)=date(minOutIdx(i,j));
+    end
+end
+
+maxInDates = unique(maxInDates);
+minInDates = unique(minInDates);
+maxOutDates = unique(maxOutDates);
+minOutDates = unique(minOutDates);
+
+maxInNames = [];
+minInNames = [];
+maxOutNames = [];
+minOutNames = [];
 
 
+for i = 1: numel(maxInDates)
+    idx = ReviewTable.dataDiCalcolo==maxInDates(i,1);
+    maxInNames = [maxInNames;ReviewTable.tkrAmmesse(idx)];
+    maxInDates(i,2) = unique(ReviewTable.DataEffettiva(idx));
+end
 
+for i = 1: numel(minInDates)
+    idx = ReviewTable.dataDiCalcolo==minInDates(i,1);
+    minInNames = [minInNames;ReviewTable.tkrAmmesse(idx)];
+    minInDates(i,2) = unique(ReviewTable.DataEffettiva(idx));
+end
 
+for i = 1: numel(maxOutDates)
+    idx = ReviewTable.dataDiCalcolo==maxOutDates(i,1);
+    maxOutNames = [maxOutNames;ReviewTable.tkrAmmesse(idx)];
+    maxOutDates(i,2) = unique(ReviewTable.DataEffettiva(idx));
+end
 
+for i = 1: numel(minOutDates)
+    idx = ReviewTable.dataDiCalcolo==minOutDates(i,1);
+    minOutNames = [minOutNames;ReviewTable.tkrAmmesse(idx)];
+    minOutDates(i,2) = unique(ReviewTable.DataEffettiva(idx));
+end
 
 
