@@ -56,7 +56,7 @@ catch ME
 end
 
 %% Input Session
-PreviousLag = 40; % calendar
+PreviousLag = 60; % calendar
 BDayCompensator = PreviousLag;
 PosteriorLag = 5; % calendar
 InvestedAmount = 100000;
@@ -167,6 +167,7 @@ for i = 1:numel(ReviewTable.dataDiCalcolo)
     
     calcDate = ReviewTable.dataDiCalcolo(i);
     reviewDate = ReviewTable.DataEffettiva(i);
+    %calcDate = reviewDate;
     
     % calculate the collection of date to start the investment, from
     % calcDate - PreviousLag to calcDate -1
@@ -323,6 +324,8 @@ for i = 2:size(medianOut,2)
     xlabel("Business days before the Calc. Date");
     ylabel(strcat("P&L on ",num2str(InvestedAmount)," eur short"));
     ytickformat('eur');
+    hline = refline(0, 0);
+    hline.Color = 'k';
 end
 for i = 2:size(medianIn,2)
     
@@ -337,6 +340,8 @@ for i = 2:size(medianIn,2)
     xlabel("Business days before the Calc. Date");
     ylabel(strcat("P&L on ",num2str(InvestedAmount)," eur long"));
     ytickformat('eur');
+    hline = refline(0, 0);
+    hline.Color = 'k';
 end
 
 %% find outliers (max & min)
